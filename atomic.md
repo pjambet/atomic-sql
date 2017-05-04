@@ -11,7 +11,7 @@ UPDATE test set x = x - 1 where id = 1;
 ```
 
 There are two important elements in the above query:
-- The where condition is invariant and deterministic (more on that [later](#condition)).
+- The `WHERE` clause is invariant and deterministic (more on that [later](#condition)).
 - The right hand side of the update statement is using the relative value instead of passing an absolute, preselected,
   value (also more on that [later](#rhs)).
 
@@ -76,6 +76,13 @@ UPDATE test set x = x + 2 WHERE x % 2 <> 0;
 ```
 
 ## <a id="rhs"></a>Right hand side
+
+You'll note that the new value passed to the `UPDATE` query doesn't know what the current value is, and this is what
+makes this query work, it'll simply increment the value (after acquiring a lock on the row) to whatever it was plus or
+minus the given difference.
+
+If we were to read the value first and use it to compute the new value, we would need to rely on more complex locking
+mechanism to ensure that the value won't change after we read it and before the `UPDATE` is done.
 
 ## Real worl example
 
