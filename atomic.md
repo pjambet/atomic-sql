@@ -102,6 +102,9 @@ psql1> UPDATE test set x = x + 1 WHERE x % 2 = 0;
 
 This creates another deadlock situation.
 
+The bottom line is: as long as you're using an equality condition on a primary key (or an immutable column) then there
+isn't much to worry about. If you don't... well, it's hard to tell what could happen.
+
 ## <a id="rhs"></a>Relative right hand side value
 
 The new value passed to the `UPDATE` query doesn't know what the current value is, and this is what makes this query
@@ -143,10 +146,11 @@ to the implementation as the inventory data "lives" in two different data stores
 
 The implementation can be summarized as:
 
-- Needs to decrement inventory for SKU x
+- We need to decrement the inventory for SKU x
 - Is the value in Redis?
-- If not, read it from the DB and set in Redis, with an explicit lock
+- If not, read it from the DB and set in Redis
 - Decrement in Redis
+- Check the new value, abort if it is too low
 
 ## Example code
 
@@ -154,5 +158,5 @@ I wrote a small test suite in Ruby highlighting the different concepts mentioned
 
 - The "safety" of a relative update query, even in read uncommitted transactions
 - The issue with absolute updates in `READ UNCOMMITTED` and `READ COMMITTED` transactions
-- An example using repeatable read of serializable transactions that requires the application to explicitly handle
-  retries for serialiazation errors.
+- An example using `REPEATABLE READ` or `SERIALIZABLE` transactions that requires the application to explicitly handle
+  retries for serialization errors.
