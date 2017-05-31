@@ -9,9 +9,10 @@ def get_db(database_name)
     Sequel.connect('postgres://pierre:@localhost:5432/pierre')
   when :mysql
     Sequel.connect('mysql2://root:@localhost:3306/test')
+  end
 end
 
-def execute(database_name, isolation_level)
+def execute(database_name, isolation_level, update_mode: :relative)
   main_db = get_db(database_name)
   main_db["update inventories set quantity = 0 where sku = 'ABC';"].first
   t0 = Time.now
@@ -25,7 +26,12 @@ def execute(database_name, isolation_level)
           begin
             db.transaction(isolation: isolation_level) do
               val = nil
-              db.run("update inventories set quantity = quantity + 1 where sku = 'ABC';")
+              if update_mode == :relative
+                db.run("update inventories set quantity = quantity + 1 where sku = 'ABC';")
+              elsif update_mode == :absolute
+                val = db["select quantity from inventories where sku = 'ABC';"].first[:quantity]
+                db.run("update inventories set quantity = #{val} where sku = 'ABC';")
+              end
             end
             done = true
           rescue StandardError => e
@@ -42,7 +48,7 @@ def execute(database_name, isolation_level)
   main_db["select * from inventories where sku = 'ABC';"].first[:quantity]
 end
 
-describe "Isolation levels" do
+describe "Relative updates" do
   describe "with pg" do
     # Local setup:
     # $> psql
@@ -90,6 +96,61 @@ describe "Isolation levels" do
     describe "read committed" do
       it "works" do
         execute(:mysql, :committed).must_equal 500
+      end
+    end
+
+    describe "repeatable read" do
+      it "works" do
+        execute(:mysql, :repeatable).must_equal 500
+      end
+    end
+
+    describe "serializable" do
+      it "works" do
+        execute(:mysql, :serializable).must_equal 500
+      end
+    end
+  end
+end
+
+
+describe "Absolute updates" do
+  describe "with pg" do
+    describe "read uncommitted" do
+      it "works" do
+        execute(:pg, :uncommitted, update_mode: :absolute).wont_equal 500
+      end
+    end
+
+    describe "read committed" do
+      it "works" do
+        execute(:pg, :committed, update_mode: :absolute).wont_equal 500
+      end
+    end
+
+    describe "repeatable read" do
+      it "works" do
+        execute(:pg, :repeatable).must_equal 500
+      end
+    end
+
+    describe "serializable" do
+      it "works" do
+        execute(:pg, :serializable).must_equal 500
+      end
+    end
+  end
+
+  describe "with mysql" do
+    describe "read uncommitted" do
+      it "works" do
+        execute(:mysql, :uncommitted, update_mode: :absolute).wont_equal 500
+      end
+    end
+
+    describe "read committed" do
+      it "works" do
+        execute(:mysql, :committed, update_mode: :absolute).wont_equal 500
       end
     end
 
