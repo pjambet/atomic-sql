@@ -1,4 +1,4 @@
-# Atomic increment/decrement operations in SQL (and fun with locks) 
+# Atomic increment/decrement operations in SQL (and fun with locks)
 
 ## tl;dr;
 __SQL supports atomic increment and decrement operations on numeric columns. The "trick" is to use an update query based
@@ -35,14 +35,14 @@ insert into test values (2, 0);
 We can trigger a deadlock with two `psql` sessions:
 
 ```sql
-$1> psql 
-psql1> BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
+$1> psql
+psql1> BEGIN;
 psql1> UPDATE test SET x = x + 1 WHERE id = 1; -- A lock is acquired on the row with id 1, no other transactions can update it
 ```
 
 ```sql
-$2> psql 
-psql2> BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
+$2> psql
+psql2> BEGIN;
 psql2> UPDATE test SET x = x + 1 WHERE id = 2; -- A lock is acquired on the row with id 2, no other transactions can update it
 ```
 
@@ -67,11 +67,10 @@ CONTEXT:  while updating tuple (0,1) in relation "test"
 Postgresql automatically detects the situation after a few seconds and will automatically roll back one of the
 transactions, allowing the other one to commit successfully.
 
-_Note: This situation wouldn't happen with `READ UNCOMMITTED` transactions since a transaction can see what has been
-modified by another transaction even before it commits (as the transaction level name implies)_
+_Note: This situation will happen with all transaction isolation levels_
 
 ### Solution
-  
+
 One way to prevent this is to use a deterministic ordering when multiple rows are updated in the transations, in this
 case, if both transactions had sorted the rows by ascending id for instance, there wouldn't have been any deadlocks.
 
@@ -83,15 +82,15 @@ COMMITTED` isolation level is the determinism of the condition used in the `WHER
 Let's look at what can happen with a less trivial query:
 
 ```sql
-$1> psql 
+$1> psql
 psql1> BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
 psql1> UPDATE test SET x = x + 1 WHERE id = 2; -- A lock is acquired on the row with id 2, no other transaction can update it
 ```
 
 ```sql
-$2> psql 
+$2> psql
 psql2> BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
-psql2> UPDATE test set x = x + 1 WHERE x % 2 = 0; 
+psql2> UPDATE test set x = x + 1 WHERE x % 2 = 0;
 -- A lock is acquired on all rows with an even x value, since there's a lock on the row with id 2, this query waits for
 -- the first transaction to commit or rollback
 ```
@@ -104,6 +103,10 @@ This creates another deadlock situation.
 
 The bottom line is: as long as you're using an equality condition on a primary key (or an immutable column) then there
 isn't much to worry about. If you don't... well, it's hard to tell what could happen.
+
+__note: Using a restrictive isolation level such as REPEATABLE READ or SERIALIZABLE might actually make things more
+complicated as the application code would need to handle serialization failures with some sort of retry logic. There are
+examples in the code section at the bottom of the article__
 
 ## <a id="rhs"></a>Relative right hand side value
 
