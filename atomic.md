@@ -104,9 +104,9 @@ This creates another deadlock situation.
 The bottom line is: as long as you're using an equality condition on a primary key (or an immutable column) then there
 isn't much to worry about. If you don't... well, it's hard to tell what could happen.
 
-__note: Using a restrictive isolation level such as REPEATABLE READ or SERIALIZABLE might actually make things more
+_Note: Using a restrictive isolation level such as REPEATABLE READ or SERIALIZABLE might actually make things more
 complicated as the application code would need to handle serialization failures with some sort of retry logic. There are
-examples in the code section at the bottom of the article__
+examples in the code section at the bottom of the article_
 
 ## <a id="rhs"></a>Relative right hand side value
 
